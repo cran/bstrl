@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Example Streaming RL on Simulated Data</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+<style type="text/css">
+  code {
+    white-space: pre;
+  }
+  .sourceCode {
+    overflow: visible;
+  }
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Example Streaming RL on Simulated Data</h1>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(bstrl)</span></code></pre></div>
+<div id="data" class="section level1">
+<h1>Data</h1>
+<p>We will be using the included data, <code>geco_small</code>, a small
+simulated dataset with 7 files, 14 fields per file, known true
+identities, and 3 errors per duplicated record. This variable contains a
+list of data frames, each of which represents a file with 10 records
+each.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">length</span>(geco_small)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 7</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(geco_small[[<span class="dv">1</span>]])</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           rec.id entity given.name    surname age occup extra1 extra2 extra3</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3   rec-0252-org    252   harrison  widdowson   a     4      6      7      5</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 7   rec-0534-org    534     taylah     deakin   f     2     12      4      8</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 10  rec-0605-org    605        jai      green   k     2      2     10      4</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 73  rec-4150-org   4150    spencer      blake   g     5      4     12     11</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 107 rec-5641-org   5641    makenzi   chandler   j     2      6      4      4</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 112 rec-5932-org   5932      blake gilbertson   g     1     12     11      9</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     extra4 extra5 extra6 extra7 extra8 extra9 extra10</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3        1      8      3      3      1      1       8</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 7        7      3      5      9      2      2       6</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 10       5     10      2      6      1      5       4</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 73      10      5      6      7      5      1       5</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 107      8     11      7     11      7     10       6</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 112     12      4      4      7      8      7       3</span></span></code></pre></div>
+<p>A larger version of this dataset is also included as
+<code>geco_30over_3err</code>.</p>
+<p>To perform linkage, we first have to define the fields we will be
+using and their data types. For this example we will only use a subset
+of the available fields.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Names of the columns on which to perform linkage</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>fieldnames <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;given.name&quot;</span>, <span class="st">&quot;surname&quot;</span>, <span class="st">&quot;age&quot;</span>, <span class="st">&quot;occup&quot;</span>, <span class="st">&quot;extra1&quot;</span>, <span class="st">&quot;extra2&quot;</span>, <span class="st">&quot;extra3&quot;</span>, <span class="st">&quot;extra4&quot;</span>, <span class="st">&quot;extra5&quot;</span>, <span class="st">&quot;extra6&quot;</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># How to compare each of the fields</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>types <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;lv&quot;</span>, <span class="st">&quot;lv&quot;</span>, <span class="co"># First name and last name use normalized edit distance</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;bi&quot;</span>, <span class="st">&quot;bi&quot;</span>, <span class="st">&quot;bi&quot;</span>, <span class="st">&quot;bi&quot;</span>, <span class="st">&quot;bi&quot;</span>, <span class="st">&quot;bi&quot;</span>, <span class="st">&quot;bi&quot;</span>, <span class="st">&quot;bi&quot;</span>) <span class="co"># All others binary equal/unequal</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>breaks <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.25</span>, <span class="fl">0.5</span>) <span class="co"># Break continuous difference measures into 4 levels using these split points</span></span></code></pre></div>
+<p>We will link using the fields <code>given.name</code>,
+<code>surname</code>, <code>age</code>, <code>occup</code>, and
+<code>extra1</code> through <code>extra6</code>. Given name and surname
+are compared using normalized Levenshtein edit distance, with breaks at
+0, 0.25, and 0.5. In other words, exact equality is given its own level,
+then there are three levels for varying inequality. All other fields are
+compared in a binary fashion.</p>
+</div>
+<div id="streaming-record-linkage" class="section level1">
+<h1>Streaming Record Linkage</h1>
+<div id="base-two-file-linkage" class="section level2">
+<h2>Base two file linkage</h2>
+<p>To perform streaming record linkage, we need an initial two-file
+linkage to use as a base for streaming updates. This is accomplished
+using the <code>bipartiteRL</code> function which outsources the task to
+the <code>BRL</code> package.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>res.twofile <span class="ot">&lt;-</span> <span class="fu">bipartiteRL</span>(geco_small[[<span class="dv">1</span>]], geco_small[[<span class="dv">2</span>]],</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                           <span class="at">flds =</span> fieldnames, <span class="at">types =</span> types, <span class="at">breaks =</span> breaks,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                           <span class="at">nIter =</span> <span class="dv">600</span>, <span class="at">burn =</span> <span class="dv">100</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                           <span class="at">seed =</span> <span class="dv">0</span>)</span></code></pre></div>
+<p>It is important to pass the comparison details we created earlier to
+this function as shown. These will be stored with the result and used in
+future streaming updates. Further information on function parameters can
+be found in the documentation by running
+<code>help(bipartiteRL)</code>.</p>
+</div>
+<div id="pprb-updates" class="section level2">
+<h2>PPRB updates</h2>
+<p>To perform PPRB updates, pass an existing result object and a new
+data frame to the function <code>PPRBupdate</code>, along with
+parameters that define how the sampling should proceed.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>res.pprb3 <span class="ot">&lt;-</span> <span class="fu">PPRBupdate</span>(res.twofile, geco_small[[<span class="dv">3</span>]], <span class="co"># Comparison details are stored with previous result</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>                       <span class="at">nIter =</span> <span class="dv">600</span>, <span class="at">burn =</span> <span class="dv">100</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>                       <span class="at">seed =</span> <span class="dv">0</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>                       <span class="at">refresh =</span> <span class="fl">0.05</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 30/600 [5%] (burn)</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 60/600 [10%] (burn)</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 90/600 [15%] (burn)</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 120/600 [20%]</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 150/600 [25%]</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 180/600 [30%]</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 210/600 [35%]</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 240/600 [40%]</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 270/600 [45%]</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 300/600 [50%]</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 330/600 [55%]</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 360/600 [60%]</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 390/600 [65%]</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 420/600 [70%]</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 450/600 [75%]</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 480/600 [80%]</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 510/600 [85%]</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 540/600 [90%]</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 570/600 [95%]</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 600/600 [100%]</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>res.pprb4 <span class="ot">&lt;-</span> <span class="fu">PPRBupdate</span>(res.pprb3, geco_small[[<span class="dv">4</span>]], <span class="co"># Comparison details are stored with previous result</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>                       <span class="at">nIter =</span> <span class="dv">600</span>, <span class="at">burn =</span> <span class="dv">100</span>,</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>                       <span class="at">seed =</span> <span class="dv">0</span>,</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>                       <span class="at">refresh =</span> <span class="fl">0.05</span>)</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 30/600 [5%] (burn)</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 60/600 [10%] (burn)</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 90/600 [15%] (burn)</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 120/600 [20%]</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 150/600 [25%]</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 180/600 [30%]</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 210/600 [35%]</span></span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 240/600 [40%]</span></span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 270/600 [45%]</span></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 300/600 [50%]</span></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 330/600 [55%]</span></span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 360/600 [60%]</span></span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 390/600 [65%]</span></span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 420/600 [70%]</span></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 450/600 [75%]</span></span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 480/600 [80%]</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 510/600 [85%]</span></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 540/600 [90%]</span></span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 570/600 [95%]</span></span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 600/600 [100%]</span></span></code></pre></div>
+<p>Further information on function parameters can be found in the
+documentation by running <code>help(PRPBupdate)</code>.</p>
+</div>
+<div id="smcmc-updates" class="section level2">
+<h2>SMCMC updates</h2>
+<p>To perform SMCMC updates, pass an existing result object and a new
+data frame to the function <code>SMCMCupdate</code>, along with
+parameters that define how the sampling should proceed.</p>
+<p>First, SMCMC can work with a smaller number of iterations than PPRB.
+To filter an existing result object by thinning every <span class="math inline">\(n^{th}\)</span> posterior sample, run the
+<code>thinsamples</code> function. SMCMC produces <em>independent</em>
+samples from the posterior, so filter to the number of independent
+samples that would be desired from the posterior distribution for
+estimating your parameters or quantities of interest.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>filtered <span class="ot">&lt;-</span> <span class="fu">thinsamples</span>(res.twofile, <span class="dv">50</span>) <span class="co"># Don&#39;t need 500, 50 for demonstration</span></span></code></pre></div>
+<p>The filtered sample pool can be passed to a streaming update in the
+same way as any result object.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>res.smcmc3 <span class="ot">&lt;-</span> <span class="fu">SMCMCupdate</span>(filtered, geco_small[[<span class="dv">3</span>]],</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                         <span class="at">nIter.jumping=</span><span class="dv">2</span>, <span class="at">nIter.transition =</span> <span class="dv">8</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                         <span class="at">proposals.jumping=</span><span class="st">&quot;component&quot;</span>, <span class="at">proposals.transition=</span><span class="st">&quot;component&quot;</span>, <span class="co">#Either can be LB, but increase corresponding number of iterations</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                         <span class="at">cores =</span> <span class="dv">2</span>) <span class="co"># Parallel execution</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Random seed not set in parallel execution.</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>res.smcmc4 <span class="ot">&lt;-</span> <span class="fu">SMCMCupdate</span>(res.smcmc3, geco_small[[<span class="dv">4</span>]],</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>                         <span class="at">nIter.jumping=</span><span class="dv">2</span>, <span class="at">nIter.transition =</span> <span class="dv">8</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>                         <span class="at">proposals.jumping=</span><span class="st">&quot;component&quot;</span>, <span class="at">proposals.transition=</span><span class="st">&quot;component&quot;</span>, <span class="co">#Either can be LB, but increase corresponding number of iterations</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>                         <span class="at">cores =</span> <span class="dv">2</span>) <span class="co"># Parallel execution</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Random seed not set in parallel execution.</span></span></code></pre></div>
+<p>SMCMC uses two MCMC kernels, a jumping kernel and a transition
+kernel, which are performed on each member of the ensemble in parallel.
+The jumping kernel is used to initialize the links to the latest file,
+and the transition kernel is used to simultaneously update all
+parameters.</p>
+<p>This results in two differences to the function’s parameters. Instead
+of a single <code>nIter</code> parameter, <code>SMCMCupdate</code> has
+two: <code>nIter.jumping</code> and <code>nIter.transition</code>. The
+function also has two parameters, <code>proposals.jumping</code> and
+<code>proposals.transition</code>, which define the update method for
+the link parameters. <code>nIter.jumping</code> can be relatively
+smaller than <code>nIter.transition</code>, since the transition kernel
+will continue to update links to the latest file. Both values must be
+larger if either proposal is set to “LB” - locally balanced proposals
+have slower mixing than component-wise.</p>
+</div>
+<div id="analyzing-results" class="section level2">
+<h2>Analyzing results</h2>
+<p>Results objects are made up of a list containing posterior samples of
+each parameter.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(res.pprb4)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  [1] &quot;Z&quot;           &quot;m&quot;           &quot;u&quot;           &quot;files&quot;       &quot;comparisons&quot;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  [6] &quot;priors&quot;      &quot;cmpdetails&quot;  &quot;m.fc.pars&quot;   &quot;u.fc.pars&quot;   &quot;diagnostics&quot;</span></span></code></pre></div>
+<p>The values of <code>Z</code>, <code>m</code>, and <code>u</code> are
+link parameters. They are stored as matrices where each column is a
+posterior sample and each row is a component of the vector-valued
+parameters. The value of <code>diagnostics</code> is used internally by
+some functions, and all other values store details necessary to perform
+streaming updates when further files arrive.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># All have 500 columns and different numbers of rows.</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(res.pprb4<span class="sc">$</span>Z)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1]  30 500</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(res.pprb4<span class="sc">$</span>m)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1]  24 500</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(res.pprb4<span class="sc">$</span>u)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1]  24 500</span></span></code></pre></div>
+<p>The <code>Z</code> parameter contains posterior samples of links
+between records, so is the main parameter of interest in record linkage
+applications.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The first post-burn MCMC sample of Z</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>Zexample <span class="ot">&lt;-</span> res.pprb4<span class="sc">$</span>Z[,<span class="dv">1</span>]</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>Zexample</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  [1]  3 12 13 14 15 16  7  9 10 20  1 22 13 24 14 26  6  8 29 20 31 32 33 34  5</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [26] 36 18 38 39 30</span></span></code></pre></div>
+<p>The parameter <span class="math inline">\(Z\)</span> contains one
+value per record starting in file 2. The value at an index gives the
+record to which the corresponding record is linked. For example,</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>Zexample[<span class="dv">8</span>]</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 9</span></span></code></pre></div>
+<p>indicates that the <span class="math inline">\(8^{th}\)</span> record
+in file 2 is linked to the <span class="math inline">\(9^{th}\)</span>
+record in file 1. These links can also lead to further links, such
+as</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>Zexample[<span class="dv">27</span>]</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 18</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>Zexample[<span class="dv">8</span>]</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 9</span></span></code></pre></div>
+<p>collectively defining a cluster of the <span class="math inline">\(7^{th}\)</span> record in file 4, the <span class="math inline">\(8^{th}\)</span> record in file 2 and the <span class="math inline">\(9^{th}\)</span> record in file 1.</p>
+<p>This is unwieldy for an increasing number of files or for larger
+files, so functions to process these links are provided.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a list of length 500, where each element is one streaming link object</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="co"># for each posterior sample.</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>samples <span class="ot">&lt;-</span> <span class="fu">extractlinks</span>(res.pprb4)</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Are record 9 in file 1 and record 7 in file 4 linked in the first posterior sample?</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="fu">islinked</span>(samples[[<span class="dv">1</span>]], <span class="at">file1=</span><span class="dv">1</span>, <span class="at">record1=</span><span class="dv">9</span>, <span class="at">file2=</span><span class="dv">4</span>, <span class="at">record2=</span><span class="dv">7</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="co"># In what proportion of posterior samples are record 9 in file 1 and record 7 in file 4 linked?</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="fu">mean</span>(<span class="fu">sapply</span>(samples, islinked, <span class="at">file1=</span><span class="dv">1</span>, <span class="at">record1=</span><span class="dv">9</span>, <span class="at">file2=</span><span class="dv">4</span>, <span class="at">record2=</span><span class="dv">7</span>))</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 1</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="co"># In what proportion of posterior samples are record 8 in file 1 and record 1 in file 2 linked?</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="fu">mean</span>(<span class="fu">sapply</span>(samples, islinked, <span class="at">file1=</span><span class="dv">1</span>, <span class="at">record1=</span><span class="dv">8</span>, <span class="at">file2=</span><span class="dv">2</span>, <span class="at">record2=</span><span class="dv">1</span>))</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 0</span></span></code></pre></div>
+</div>
+</div>
+<div id="method-notes-and-caveats" class="section level1">
+<h1>Method notes and caveats</h1>
+<div id="locally-balanced-proposals" class="section level2">
+<h2>Locally balanced proposals</h2>
+<p>Locally balanced proposals are an alternate way for link vectors to
+be sampled by an MCMC. While component-wise proposals draw values from
+the full conditional distribution of each component of a link vector -
+essentially updating the link of each record in each file sequentially -
+locally balanced proposals perform an add, delete, or swap operation
+based on the target posterior probability. Locally balanced proposals
+sample by more intelligently moving through the space of possible links
+between records at the cost of slower mixing (because fewer links can be
+updated in any one iteration). Locally balanced proposals have another
+advantage in that they can be blocked. Blocking allows for a locally
+balanced proposal to only consider a small subset of records for its
+proposal, reducing the time required at the cost of even slower
+mixing.</p>
+<p>In streaming update functions such as <code>SMCMCupdate</code>, the
+<code>proposals.jumping</code> and <code>proposals.transition</code>
+parameters can instruct the sampler to use locally balanced proposals
+and the <code>blocksize</code> parameter can be used to enable blocking.
+Similar options are also available in the <code>multifileRL</code>
+function.</p>
+</div>
+<div id="mixing-streaming-updates" class="section level2">
+<h2>Mixing Streaming Updates</h2>
+<p>Streaming updates can be mixed and matched. For example, file 3 can
+be incorporated using a PPRB update and file 4 can be incorporated using
+an SMCMC update.</p>
+</div>
+<div id="mcmc-iterations" class="section level2">
+<h2>MCMC Iterations</h2>
+<p>The number of MCMC iterations does not need to be the same in
+subsequent streaming updates. This is especially useful when alternating
+between SMCMC updates (which can function well with small ensembles) and
+PPRB updates (which can quickly produce large numbers of samples).</p>
+</div>
+<div id="pprb-sample-degredation" class="section level2">
+<h2>PPRB Sample Degredation</h2>
+<p>As a filtering method, PPRB reduces the number of distinct values
+within its sample pool after repeated use. Eventually, this can lead to
+inaccurate estimates of quantities of interest as the pool has degraded
+too much. To couteract this, SMCMC updates can be occasionally used to
+refresh the diversity of available samples.</p>
+</div>
+</div>
+<div id="non-streaming-multifile-record-linkage" class="section level1">
+<h1>Non-streaming Multifile Record Linkage</h1>
+<p>This package also provides the option to perform non-streaming,
+multi-file record linkage using a Gibbs sampler. This can be done using
+the <code>multifileRL</code> function. This is significantly slower than
+streaming record linkage and is only provided for educational
+purposes.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Link three files from scratch, returning 500 posterior samples</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>res.threefile <span class="ot">&lt;-</span> <span class="fu">multifileRL</span>(geco_small[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>],</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>                             <span class="at">flds =</span> fieldnames, <span class="at">types =</span> types, <span class="at">breaks =</span> breaks,</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>                             <span class="at">nIter =</span> <span class="dv">600</span>, <span class="at">burn=</span><span class="dv">100</span>, <span class="co"># Number of iterations to run</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>                             <span class="at">proposals =</span> <span class="st">&quot;comp&quot;</span>, <span class="co"># Change to &quot;LB&quot; for faster iterations, slower convergence</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>                             <span class="at">seed =</span> <span class="dv">0</span>,</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>                             <span class="at">refresh =</span> <span class="fl">0.05</span>) <span class="co"># Print progress every 5% of run.</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 30/600 [5%] (burn)</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 60/600 [10%] (burn)</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 90/600 [15%] (burn)</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 120/600 [20%]</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 150/600 [25%]</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 180/600 [30%]</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 210/600 [35%]</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 240/600 [40%]</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 270/600 [45%]</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 300/600 [50%]</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 330/600 [55%]</span></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 360/600 [60%]</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 390/600 [65%]</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 420/600 [70%]</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 450/600 [75%]</span></span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 480/600 [80%]</span></span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 510/600 [85%]</span></span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 540/600 [90%]</span></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 570/600 [95%]</span></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 600/600 [100%]</span></span></code></pre></div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
